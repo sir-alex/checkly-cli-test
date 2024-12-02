@@ -17,6 +17,7 @@ import { splitConfigFilePath, getGitInformation } from '../services/util'
 import commonMessages from '../messages/common-messages'
 import { ProjectDeployResponse } from '../rest/projects'
 import { uploadSnapshots } from '../services/snapshot-service'
+import { DeployPreview, IResourceItem } from '../services/deploy-preview'
 
 // eslint-disable-next-line no-restricted-syntax
 enum ResourceDeployStatus {
@@ -128,7 +129,8 @@ export default class Deploy extends AuthCommand {
     try {
       const { data } = await api.projects.deploy({ ...projectPayload, repoInfo }, { dryRun: preview, scheduleOnDeploy })
       if (preview || output) {
-        this.log(this.formatPreview(data, project))
+        const preview = await this.formatPreview(data, project)
+        this.log(preview)
       }
       if (!preview) {
         await ux.wait(500)
@@ -153,7 +155,7 @@ export default class Deploy extends AuthCommand {
     }
   }
 
-  private formatPreview (previewData: ProjectDeployResponse, project: Project): string {
+  private async formatPreview (previewData: ProjectDeployResponse, project: Project): Promise<string> {
     // Current format of the data is: { checks: { logical-id-1: 'UPDATE' }, groups: { another-logical-id: 'CREATE' } }
     // We convert it into update: [{ logicalId, resourceType, construct }, ...], create: [], delete: []
     // This makes it easier to display.
@@ -249,6 +251,8 @@ export default class Deploy extends AuthCommand {
       output.push('')
     }
     if (sortedUpdating.length) {
+      const deployPreviewInst = new DeployPreview(sortedUpdating as IResourceItem[])
+      const deployPreview = await deployPreviewInst.getPreview()
       output.push(chalk.bold.magenta('Update and Unchanged:'))
       for (const { logicalId, construct } of sortedUpdating) {
         output.push(`    ${construct.constructor.name}: ${logicalId}`)

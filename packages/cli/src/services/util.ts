@@ -25,6 +25,11 @@ export interface CiInformation {
   environment: string | null
 }
 
+type GetArrDiffByKeys<T> = {
+  id: T
+  diff: Array<Record<string, [any, any]>>
+}
+
 export function findFilesRecursively (directory: string, ignoredPaths: Array<string> = []) {
   if (!fsSync.statSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
     return []
@@ -223,3 +228,43 @@ export function assignProxy (baseURL: string, axiosConfig: CreateAxiosDefaults) 
   axiosConfig.proxy = false
   return axiosConfig
 }
+
+export function uniqValFromArrByKey<
+  T extends object,
+  K extends keyof T
+> (arr: T[], key: K): T[K][] {
+  const resourcesTypesSet = new Set<T[K]>()
+  arr.forEach((item) => {
+    if (item?.[key]) resourcesTypesSet.add(item[key])
+  })
+  return Array.from(resourcesTypesSet)
+}
+
+export function getArrDiffByKeys<T, K extends keyof T> (
+  arr1: T[],
+  arr2: T[],
+  idKey: K,
+  keysMap: [keyof T, keyof T][],
+): GetArrDiffByKeys<T[K]>[] {
+  return arr1
+    .map((item1) => {
+      const match = arr2.find((item2) => item2[idKey] === item1[idKey])
+      if (!match) return null
+
+      const diff = keysMap
+        .map(([key1, key2]) => {
+          if (item1[key1] !== match[key2]) {
+            return { [key1]: [item1[key1], match[key2]] }
+          }
+          return null
+        })
+        .filter(Boolean)
+
+      return diff.length > 0
+        ? { id: item1[idKey], diff }
+        : null
+    })
+    .filter(Boolean) as GetArrDiffByKeys<T[K]>[]
+}
+
+export * as utilsService from './util'
